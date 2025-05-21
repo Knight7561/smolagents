@@ -279,7 +279,7 @@ class SpeechToTextTool(PipelineTool):
     def decode(self, outputs):
         return self.pre_processor.batch_decode(outputs, skip_special_tokens=True)[0]
 
-
+# adding base tools required for agents
 TOOL_MAPPING = {
     tool_class.name: tool_class
     for tool_class in [

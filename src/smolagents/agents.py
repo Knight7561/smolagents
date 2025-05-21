@@ -14,12 +14,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
+import inspect#used to pass parameters of a object
 import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
+# rich is lib for terminal asthetics
 from rich import box
 from rich.console import Group
 from rich.panel import Panel
@@ -27,7 +28,9 @@ from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.text import Text
 
+# default tools requried by the agents
 from .default_tools import TOOL_MAPPING, FinalAnswerTool
+# Sandbox to execute python
 from .e2b_executor import E2BExecutor
 from .local_python_executor import (
     BASE_BUILTIN_MODULES,
@@ -35,7 +38,9 @@ from .local_python_executor import (
     fix_final_answer_code,
 )
 from .models import (
+    # Class has args needed for a fully defined messgae such as role, text, tools
     ChatMessage,
+    # class predefing roles of each dialogue
     MessageRole,
 )
 from .monitoring import Monitor
@@ -53,8 +58,10 @@ from .prompts import (
     USER_PROMPT_PLAN_UPDATE,
 )
 from .tools import (
+    # format to print tool information
     DEFAULT_TOOL_DESCRIPTION_TEMPLATE,
     Tool,
+    # funtion to pass tool to DEFAULT_TOOL_DESCRIPTION_TEMPLATE and complie it via Jinja
     get_tool_description_with_args,
 )
 from .types import AgentAudio, AgentImage, handle_agent_output_types
@@ -80,6 +87,7 @@ class ToolCall:
 
 
 class AgentStepLog:
+    """Basic class to extend any log step"""
     pass
 
 
@@ -100,12 +108,14 @@ class ActionStep(AgentStepLog):
 
 @dataclass
 class PlanningStep(AgentStepLog):
+    """Logging Planning step, what is the plan and facts"""
     plan: str
     facts: str
 
 
 @dataclass
 class TaskStep(AgentStepLog):
+    """Class to hold text task and images if any"""
     task: str
     task_images: List[str] | None = None
 
@@ -116,10 +126,12 @@ class SystemPromptStep(AgentStepLog):
 
 
 def get_tool_descriptions(tools: Dict[str, Tool], tool_description_template: str) -> str:
+    """Get tool descriptions for all tools"""
     return "\n".join([get_tool_description_with_args(tool, tool_description_template) for tool in tools.values()])
 
 
 def format_prompt_with_tools(tools: Dict[str, Tool], prompt_template: str, tool_description_template: str) -> str:
+    """Replace tools with tool description(formatted) in the prompt"""
     tool_descriptions = get_tool_descriptions(tools, tool_description_template)
     prompt = prompt_template.replace("{{tool_descriptions}}", tool_descriptions)
     if "{{tool_names}}" in prompt:
@@ -131,6 +143,9 @@ def format_prompt_with_tools(tools: Dict[str, Tool], prompt_template: str, tool_
 
 
 def show_agents_descriptions(managed_agents: Dict):
+    """
+    Listing all the agents in a prompt for manager agent
+    """
     managed_agents_descriptions = """
 You can also give requests to team members.
 Calling a team member works the same as for calling a tool: simply, the only argument you can give in the call is 'request', a long string explaining your request.
@@ -146,6 +161,7 @@ def format_prompt_with_managed_agents_descriptions(
     managed_agents,
     agent_descriptions_placeholder: Optional[str] = None,
 ) -> str:
+    """Adding managed_agents_descriptions to the prompt with proper description"""
     if agent_descriptions_placeholder is None:
         agent_descriptions_placeholder = "{{managed_agents_descriptions}}"
     if agent_descriptions_placeholder not in prompt_template:
@@ -221,6 +237,7 @@ class MultiStepAgent:
         self.tools = {tool.name: tool for tool in tools}
         if add_base_tools:
             for tool_name, tool_class in TOOL_MAPPING.items():
+                # Excluding python_interpreter as one of the tools
                 if tool_name != "python_interpreter" or self.__class__.__name__ == "ToolCallingAgent":
                     self.tools[tool_name] = tool_class()
         self.tools["final_answer"] = FinalAnswerTool()
@@ -235,6 +252,10 @@ class MultiStepAgent:
         self.step_callbacks.append(self.monitor.update_metrics)
 
     def initialize_system_prompt(self):
+        """
+        inits system prompt with tools formatted and description with manager agent
+        """
+        # getting system prompt with tools described
         self.system_prompt = format_prompt_with_tools(
             self.tools,
             self.system_prompt_template,
@@ -488,6 +509,7 @@ class MultiStepAgent:
         """To be implemented in children classes. Should return either None if the step is not final."""
         pass
 
+    # implementing the run step / REAct step
     def run(
         self,
         task: str,
@@ -523,10 +545,10 @@ class MultiStepAgent:
 You have been provided with these additional arguments, that you can access using the keys as variables in your python code:
 {str(additional_args)}."""
 
-        self.initialize_system_prompt()
-        system_prompt_step = SystemPromptStep(system_prompt=self.system_prompt)
+        self.initialize_system_prompt() # inits system prompt with tools and managed agent
+        system_prompt_step = SystemPromptStep(system_prompt=self.system_prompt) # formatting SysPrompt
 
-        if reset:
+        if reset: # needed to cleans log between cycle
             self.logs = []
             self.logs.append(system_prompt_step)
             self.monitor.reset()
@@ -534,7 +556,7 @@ You have been provided with these additional arguments, that you can access usin
             if len(self.logs) > 0:
                 self.logs[0] = system_prompt_step
             else:
-                self.logs.append(system_prompt_step)
+                self.logs.append(system_prompt_step) # adding sysprompt to log
 
         self.logger.log(
             Panel(
@@ -545,7 +567,7 @@ You have been provided with these additional arguments, that you can access usin
                 subtitle_align="left",
             ),
             level=LogLevel.INFO,
-        )
+        ) # print log to user
 
         self.logs.append(TaskStep(task=self.task, task_images=images))
         if single_step:
@@ -557,7 +579,6 @@ You have been provided with these additional arguments, that you can access usin
             # Run the agent's step
             result = self.step(step_log)
             return result
-
         if stream:
             # The steps are returned as they are executed through a generator to iterate on.
             return self._run(task=self.task, images=images)
@@ -567,7 +588,6 @@ You have been provided with these additional arguments, that you can access usin
     def _run(self, task: str, images: List[str] | None = None) -> Generator[str, None, None]:
         """
         Run the agent in streaming mode and returns a generator of all the steps.
-
         Args:
             task (`str`): Task to perform.
             images (`list[str]`): Paths to image(s).
@@ -596,7 +616,6 @@ You have been provided with these additional arguments, that you can access usin
                     ),
                     level=LogLevel.INFO,
                 )
-
                 # Run one step!
                 final_answer = self.step(step_log)
             except AgentError as e:
@@ -885,9 +904,12 @@ class CodeAgent(MultiStepAgent):
         max_print_outputs_length: Optional[int] = None,
         **kwargs,
     ):
+        print("init::CodeAgent")
         if system_prompt is None:
+            # default system prompt (the big one with in shot examples)
             system_prompt = CODE_SYSTEM_PROMPT
 
+        # By default []
         self.additional_authorized_imports = additional_authorized_imports if additional_authorized_imports else []
         self.authorized_imports = list(set(BASE_BUILTIN_MODULES) | set(self.additional_authorized_imports))
         if "{{authorized_imports}}" not in system_prompt:
@@ -905,12 +927,12 @@ class CodeAgent(MultiStepAgent):
                 "Caution: you set an authorization for all imports, meaning your agent can decide to import any package it deems necessary. This might raise issues if the package is not installed in your environment.",
                 0,
             )
-
+        # if there are manger agents and using e2b executor
         if use_e2b_executor and len(self.managed_agents) > 0:
             raise Exception(
                 f"You passed both {use_e2b_executor=} and some managed agents. Managed agents is not yet supported with remote code execution."
             )
-
+        # user supllied tools with final_answer tool
         all_tools = {**self.tools, **self.managed_agents}
         if use_e2b_executor:
             self.python_executor = E2BExecutor(
@@ -919,6 +941,7 @@ class CodeAgent(MultiStepAgent):
                 self.logger,
             )
         else:
+            #init local python executor
             self.python_executor = LocalPythonInterpreter(
                 self.additional_authorized_imports,
                 all_tools,
@@ -945,7 +968,6 @@ class CodeAgent(MultiStepAgent):
         agent_memory = self.write_inner_memory_from_logs()
 
         self.input_messages = agent_memory.copy()
-
         # Add new step in logs
         log_entry.agent_memory = agent_memory.copy()
         try:
@@ -978,7 +1000,7 @@ class CodeAgent(MultiStepAgent):
 
         # Parse
         try:
-            code_action = fix_final_answer_code(parse_code_blobs(llm_output))
+            code_action = fix_final_answer_code(parse_code_blobs(llm_output)) #parse_code_block will extract the code to be executed ; fix_final_answer_code replaces 'final_answer' in llm output as it overlaps with final_answer tool.
         except Exception as e:
             error_msg = f"Error in code parsing:\n{e}\nMake sure to provide correct code blobs."
             raise AgentParsingError(error_msg, self.logger)

@@ -1,0 +1,93 @@
+flowchart TB
+    %% External Users and Interfaces
+    User(("User")):::external
+    CLI["CLI Interface"]:::interface
+    Gradio["Gradio UI"]:::interface
+
+    %% Smolagents Library Internals
+    subgraph "Smolagents Library"
+        direction TB
+        AgentCore["Agent Core\n(CodeAgent & ToolCallingAgent)"]:::core
+        AgentTypes["Agent Type Definitions"]:::core
+        subgraph "ReAct Loop"
+            direction TB
+            Gen["Generate Prompt"]:::core
+            Parse["Parse Code Action"]:::core
+            Exec["Execute Code"]:::core
+            Store["Store Observation"]:::core
+        end
+        ModelAdapters["Model Adapters"]:::core
+        MCPAdapter["MCP Client Adapter"]:::core
+        Prompts["Prompt Definitions"]:::core
+        ToolAbstractions["Tool Abstractions\n& Integrations"]:::core
+        VisionTool["Vision & Web Browser Tool"]:::core
+        ExecutionEnv["Execution Environment"]:::core
+        Memory(("Agent Memory")):::storage
+        Monitoring["Monitoring & Logging Hooks"]:::core
+        Utils["Utility Functions"]:::core
+    end
+
+    %% External Services
+    subgraph "External Providers"
+        direction TB
+        LLMProviders(("LLM Providers")):::external
+        ToolProviders(("Tool Providers")):::external
+    end
+
+    %% Connections
+    User --> CLI
+    User --> Gradio
+    CLI --> AgentCore
+    Gradio --> AgentCore
+
+    AgentCore --> Gen
+    Gen --> Parse
+    Parse --> Exec
+    Exec --> Store
+    Store --> Gen
+
+    AgentCore --> ModelAdapters
+    ModelAdapters --> MCPAdapter
+    ModelAdapters -->|"calls"| LLMProviders
+
+    AgentCore --> Prompts
+
+    AgentCore --> ToolAbstractions
+    ToolAbstractions --> VisionTool
+    ToolAbstractions -->|"uses"| ToolProviders
+
+    AgentCore --> ExecutionEnv
+    ExecutionEnv -->|"runs code"| ToolProviders
+    ExecutionEnv --> Memory
+    ExecutionEnv --> Monitoring
+
+    Memory --> AgentCore
+    AgentCore -->|final_answer| CLI
+    AgentCore -->|final_answer| Gradio
+
+    AgentCore --> Monitoring
+
+    %% Click Events
+    click AgentCore "https://github.com/huggingface/smolagents/blob/main/src/smolagents/agents.py"
+    click AgentTypes "https://github.com/huggingface/smolagents/blob/main/src/smolagents/agent_types.py"
+    click ModelAdapters "https://github.com/huggingface/smolagents/blob/main/src/smolagents/models.py"
+    click MCPAdapter "https://github.com/huggingface/smolagents/blob/main/src/smolagents/mcp_client.py"
+    click ToolAbstractions "https://github.com/huggingface/smolagents/blob/main/src/smolagents/tools.py"
+    click VisionTool "https://github.com/huggingface/smolagents/blob/main/src/smolagents/vision_web_browser.py"
+    click ExecutionEnv "https://github.com/huggingface/smolagents/blob/main/src/smolagents/local_python_executor.py"
+    click ExecutionEnv "https://github.com/huggingface/smolagents/blob/main/src/smolagents/remote_executors.py"
+    click Memory "https://github.com/huggingface/smolagents/blob/main/src/smolagents/memory.py"
+    click Monitoring "https://github.com/huggingface/smolagents/blob/main/src/smolagents/monitoring.py"
+    click Prompts "https://github.com/huggingface/smolagents/blob/main/src/smolagents/prompts/code_agent.yaml"
+    click Prompts "https://github.com/huggingface/smolagents/blob/main/src/smolagents/prompts/toolcalling_agent.yaml"
+    click CLI "https://github.com/huggingface/smolagents/blob/main/src/smolagents/cli.py"
+    click Gradio "https://github.com/huggingface/smolagents/blob/main/src/smolagents/gradio_ui.py"
+    click Utils "https://github.com/huggingface/smolagents/blob/main/src/smolagents/utils.py"
+    click ToolAbstractions "https://github.com/huggingface/smolagents/blob/main/src/smolagents/default_tools.py"
+    click ToolAbstractions "https://github.com/huggingface/smolagents/blob/main/src/smolagents/tool_validation.py"
+
+    %% Styles
+    classDef core fill:#D0E6FF,stroke:#0366d6,stroke-width:1px
+    classDef external fill:#E6FFEA,stroke:#28a745,stroke-width:1px
+    classDef interface fill:#FFF5CC,stroke:#D4A60D,stroke-width:1px
+    classDef storage fill:#F0F0F0,stroke:#999999,stroke-width:1px,stroke-dasharray: 5 5

@@ -169,6 +169,7 @@ Code:
 
 
 def parse_json_tool_call(json_blob: str) -> Tuple[str, Union[str, None]]:
+    """extract the name and arguments of a tool called within a JSON string"""
     json_blob = json_blob.replace("```json", "").replace("```", "")
     tool_call = parse_json_blob(json_blob)
     tool_name_key, tool_arguments_key = None, None
@@ -196,6 +197,7 @@ MAX_LENGTH_TRUNCATE_CONTENT = 20000
 
 
 def truncate_content(content: str, max_length: int = MAX_LENGTH_TRUNCATE_CONTENT) -> str:
+    """Truncate the content to max_length characters if specified or else MAX_LENGTH_TRUNCATE_CONTENT"""
     if len(content) <= max_length:
         return content
     else:

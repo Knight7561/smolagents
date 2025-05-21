@@ -46,7 +46,7 @@ DEFAULT_CODEAGENT_REGEX_GRAMMAR = {
     "value": "Thought: .+?\\nCode:\\n```(?:py|python)?\\n(?:.|\\s)+?\\n```<end_code>",
 }
 
-
+# function that prints all the class variables and its values recussively in a nested JSON format
 def get_dict_from_nested_dataclasses(obj):
     def convert(obj):
         if hasattr(obj, "__dataclass_fields__"):
@@ -92,9 +92,12 @@ class ChatMessage:
     content: Optional[str] = None
     tool_calls: Optional[List[ChatMessageToolCall]] = None
 
+    # function that converts all the class variables and its values recussively in a nested JSON format
     def model_dump_json(self):
+        # function that prints all the class variables and its values recussively in a nested JSON format
         return json.dumps(get_dict_from_nested_dataclasses(self))
 
+    #return class ChatMessage with intilised params from HF_API message
     @classmethod
     def from_hf_api(cls, message) -> "ChatMessage":
         tool_calls = None
@@ -102,6 +105,7 @@ class ChatMessage:
             tool_calls = [ChatMessageToolCall.from_hf_api(tool_call) for tool_call in message.tool_calls]
         return cls(role=message.role, content=message.content, tool_calls=tool_calls)
 
+    # returns ChatMessage class by parameters initialised from a dict
     @classmethod
     def from_dict(cls, data: dict) -> "ChatMessage":
         if data.get("tool_calls"):
@@ -124,7 +128,7 @@ def parse_json_if_needed(arguments: Union[str, dict]) -> Union[str, dict]:
         except Exception:
             return arguments
 
-
+# converts tool_call function args to a json format
 def parse_tool_args_if_needed(message: ChatMessage) -> ChatMessage:
     for tool_call in message.tool_calls:
         tool_call.function.arguments = parse_json_if_needed(tool_call.function.arguments)
